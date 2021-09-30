@@ -5,6 +5,8 @@
 #include "Adafruit_BluefruitLE_UART.h"
 
 #include "BluefruitConfig.h"
+#include "HIDKeys.h"
+#include "KeyReport.h";
 
 #if SOFTWARE_SERIAL_AVAILABLE
   #include <SoftwareSerial.h>
@@ -14,6 +16,15 @@
 #define MINIMUM_FIRMWARE_VERSION    "0.6.6"
 
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
+
+byte colPins[] = {5, 6, 9, 10, 11, 12, A5};
+byte rowPins[] = {A0, A1, A2, A3, A4};
+
+const int rowCount = 5;
+const int colCount = 7;
+
+byte keys[rowCount][colCount];
+
 
 void error(const __FlashStringHelper*err) {
   Serial.println(err);
@@ -70,71 +81,70 @@ void setup(void) {
   }
 
   /* Add or remove service requires a reset */
-//  Serial.println(F("Performing a SW reset (service changes require a reset): "));
-//  if (! ble.reset() ) {
-//    error(F("Couldn't reset??"));
-//  }
-
-  Serial.println();
-  Serial.println(F("Go to your phone's Bluetooth settings to pair your device"));
-  Serial.println(F("then open an application that accepts keyboard input"));
-
-  Serial.println();
-  Serial.println(F("Enter the character(s) to send:"));
-  Serial.println(F("- \\r for Enter"));
-  Serial.println(F("- \\n for newline"));
-  Serial.println(F("- \\t for tab"));
-  Serial.println(F("- \\b for backspace"));
-
-  Serial.println();
-}
-
-/**************************************************************************/
-/*!
-    @brief  Constantly poll for new command or response data
-*/
-/**************************************************************************/
-void loop(void)
-{
-  // Display prompt
-  Serial.print(F("keyboard > "));
-
-  // Check for user input and echo it back if anything was found
-  char keys[BUFSIZE+1];
-  getUserInput(keys, BUFSIZE);
-
-  Serial.print("\nSending ");
-  Serial.println(keys);
-
-  ble.print("AT+BleKeyboard=");
-  ble.println(keys);
-
-  if( ble.waitForOK() )
-  {
-    Serial.println( F("OK!") );
-  }else
-  {
-    Serial.println( F("FAILED!") );
+  Serial.println(F("Performing a SW reset (service changes require a reset): "));
+  if (! ble.reset() ) {
+    error(F("Couldn't reset??"));
   }
 }
 
-/**************************************************************************/
-/*!
-    @brief  Checks for user input (via the Serial Monitor)
-*/
-/**************************************************************************/
-void getUserInput(char buffer[], uint8_t maxSize)
-{
-  memset(buffer, 0, maxSize);
-  while( Serial.available() == 0 ) {
-    delay(1);
+void loop(void) {
+  KeyReport report = readMatrix();
+  if (report.wasKeyPressed()) {
+//    Serial.println(report.getModifier(), HEX);
+//    int* keys = report.getKeys();
+//    ble.print("AT+BleKeyboard=");
+//    ble.println("hello");
+
+      ble.println(F("AT+BleKeyboardCode=02-00-04-05-06-00-00"));
+      ble.println(F("AT+BLEKEYBOARDCODE=00-00"));
+
+    if( ble.waitForOK() ) {
+      Serial.println( F("OK!") );
+    } else {
+      Serial.println( F("FAILED!") );
+    }
+//    for (int i = 0; i < 6; i++) {
+//      if (keys[i] != KEY_NONE){
+//        ble.print("-07");
+//        ble.print(keys[i],HEX);
+//      }
+      
+//    }
+//    ble.println("");
+  
+      //modifiers 
+    //TODO get keys from left side
+    //TODO send report
+    //TODO release
+    // key release notification
+//    ble.println("AT+BleKeyboardCode=00-00");
+  }
+  delay(100);
+}
+
+KeyReport readMatrix() {
+  KeyReport report;
+
+  for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+    // set row output to low
+    byte rowPin = rowPins[rowIndex];
+    pinMode(rowPin, OUTPUT);
+    digitalWrite(rowPin, LOW);
+
+    for (int colIndex = 0; colIndex < colCount; colIndex++) {
+      byte columnPin = colPins[colIndex];
+      pinMode(columnPin, INPUT_PULLUP);
+      keys[rowIndex][colIndex] = digitalRead(columnPin);
+      pinMode(columnPin, INPUT);
+      if (keys[rowIndex][colIndex] == 0) {
+        // TODO translate coordinates to key mappings
+        // TODO isModifier
+        report.addKey(KEY_D);
+      }
+    }
+ 
+    pinMode(rowPin, INPUT);
   }
 
-  uint8_t count=0;
-
-  do
-  {
-    count += Serial.readBytes(buffer+count, maxSize);
-    delay(2);
-  } while( (count < maxSize) && !(Serial.available() == 0) );
+  return report;
 }
