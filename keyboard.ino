@@ -104,33 +104,40 @@ void loop(void) {
     ble.print(F("AT+BLEKEYBOARDCODE="));
     ble.print(report.getModifier(), HEX);
     ble.print(F("-00"));
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
       ble.print("-");
       ble.print(keys[i],HEX);
     }
     ble.println("");
     wasReleased = false;
     previousReport = report;
+    // TODO remove prints after dev
+    if( ble.waitForOK() ) {
+      Serial.println( F("OK!") );
+    } else {
+      Serial.println( F("FAILED!") );
+    }
   } else if (!wasReleased) {
     wasReleased = true;
     ble.println(F("AT+BLEKEYBOARDCODE=00-00"));
+    // TODO remove prints after dev
+    if( ble.waitForOK() ) {
+      Serial.println( F("OK!") );
+    } else {
+      Serial.println( F("FAILED!") );
+    }
   }
 
-  // TODO remove prints afters dev
-  if( ble.waitForOK() ) {
-    Serial.println( F("OK!") );
-  } else {
-    Serial.println( F("FAILED!") );
-  }
   delay(100);
 }
 
 
 KeyReport readMatrix() {
   KeyReport report;
+  int positions[6];
+  int currentPosition = 0;
 
   for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-    // set row output to low
     byte rowPin = rowPins[rowIndex];
     pinMode(rowPin, OUTPUT);
     digitalWrite(rowPin, LOW);
@@ -140,18 +147,27 @@ KeyReport readMatrix() {
       pinMode(columnPin, INPUT_PULLUP);
       keys[rowIndex][colIndex] = digitalRead(columnPin);
       pinMode(columnPin, INPUT);
+
       if (keys[rowIndex][colIndex] == 0) {
         int keycode = getKeyCodeAt(rowIndex, colIndex);
-        if (isModifier(keycode)) {
+        if (isLayerToggle(keycode)) {
+          changeLayer(keycode);
+        } else if (isModifier(keycode)) {
           report.addModifier(getModifierCode(keycode));
-        } else {
-          report.addKey(keycode);
+        } else if (currentPosition < 6) {
+          positions[currentPosition] = getKeyPosition(rowIndex, colIndex);
+          currentPosition += 1;
         }
       }
     }
  
     pinMode(rowPin, INPUT);
   }
+
+  for (int pos = 0; pos < currentPosition; pos++) {
+    report.addKey(getKeyCodeAtPosition(positions[pos]));
+  }
+  resetLayer();
 
   return report;
 }
