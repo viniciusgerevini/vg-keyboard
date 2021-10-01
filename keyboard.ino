@@ -7,6 +7,7 @@
 #include "BluefruitConfig.h"
 #include "HIDKeys.h"
 #include "KeyReport.h";
+#include "KeyMap.h";
 
 #if SOFTWARE_SERIAL_AVAILABLE
   #include <SoftwareSerial.h>
@@ -24,6 +25,9 @@ const int rowCount = 5;
 const int colCount = 7;
 
 byte keys[rowCount][colCount];
+
+bool wasReleased = true;
+KeyReport previousReport;
 
 
 void error(const __FlashStringHelper*err) {
@@ -81,36 +85,46 @@ void setup(void) {
   }
 
   /* Add or remove service requires a reset */
-  Serial.println(F("Performing a SW reset (service changes require a reset): "));
-  if (! ble.reset() ) {
-    error(F("Couldn't reset??"));
-  }
+  /* Serial.println(F("Performing a SW reset (service changes require a reset): ")); */
+  /* if (! ble.reset() ) { */
+  /*   error(F("Couldn't reset??")); */
+  /* } */
 }
 
 //TODO get keys from left side
 void loop(void) {
   KeyReport report = readMatrix();
+  if (!wasReleased && report.isEqual(previousReport)) {
+    delay(100);
+    return;
+  }
+
   if (report.wasKeyPressed()) {
-    // TODO handle modifiers
-    //    Serial.println(report.getModifier(), HEX);
     int* keys = report.getKeys();
-    ble.print(F("AT+BLEKEYBOARDCODE=00-00"));
+    ble.print(F("AT+BLEKEYBOARDCODE="));
+    ble.print(report.getModifier(), HEX);
+    ble.print(F("-00"));
     for (int i = 0; i < 5; i++) {
       ble.print("-");
       ble.print(keys[i],HEX);
     }
     ble.println("");
+    wasReleased = false;
+    previousReport = report;
+  } else if (!wasReleased) {
+    wasReleased = true;
     ble.println(F("AT+BLEKEYBOARDCODE=00-00"));
+  }
 
-    // TODO remove prints afters dev
-    if( ble.waitForOK() ) {
-      Serial.println( F("OK!") );
-    } else {
-      Serial.println( F("FAILED!") );
-    }
+  // TODO remove prints afters dev
+  if( ble.waitForOK() ) {
+    Serial.println( F("OK!") );
+  } else {
+    Serial.println( F("FAILED!") );
   }
   delay(100);
 }
+
 
 KeyReport readMatrix() {
   KeyReport report;
@@ -127,9 +141,12 @@ KeyReport readMatrix() {
       keys[rowIndex][colIndex] = digitalRead(columnPin);
       pinMode(columnPin, INPUT);
       if (keys[rowIndex][colIndex] == 0) {
-        // TODO translate coordinates to key mappings
-        // TODO isModifier
-        report.addKey(KEY_D);
+        int keycode = getKeyCodeAt(rowIndex, colIndex);
+        if (isModifier(keycode)) {
+          report.addModifier(getModifierCode(keycode));
+        } else {
+          report.addKey(keycode);
+        }
       }
     }
  

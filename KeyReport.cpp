@@ -45,4 +45,23 @@ int* KeyReport::getKeys(void) {
   return _keys;
 }
 
+bool KeyReport::isEqual(KeyReport report) {
+  if (&report == 0) {
+    return false;
+  }
+
+  if (report.getModifier() != this->getModifier()) {
+    return false;
+  }
+
+  int* previousKeys = report.getKeys();
+
+  for (int i = 0; i < 6; i ++) {
+    if (_keys[i] != previousKeys[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
 

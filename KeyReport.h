@@ -19,6 +19,8 @@ class KeyReport {
 
     int* getKeys(void);
 
+    bool isEqual(KeyReport report);
+
   private:
     int _modifiers;
     int _keys[6];
