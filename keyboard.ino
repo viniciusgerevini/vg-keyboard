@@ -87,37 +87,27 @@ void setup(void) {
   }
 }
 
+//TODO get keys from left side
 void loop(void) {
   KeyReport report = readMatrix();
   if (report.wasKeyPressed()) {
-//    Serial.println(report.getModifier(), HEX);
-//    int* keys = report.getKeys();
-//    ble.print("AT+BleKeyboard=");
-//    ble.println("hello");
+    // TODO handle modifiers
+    //    Serial.println(report.getModifier(), HEX);
+    int* keys = report.getKeys();
+    ble.print(F("AT+BLEKEYBOARDCODE=00-00"));
+    for (int i = 0; i < 5; i++) {
+      ble.print("-");
+      ble.print(keys[i],HEX);
+    }
+    ble.println("");
+    ble.println(F("AT+BLEKEYBOARDCODE=00-00"));
 
-      ble.println(F("AT+BleKeyboardCode=02-00-04-05-06-00-00"));
-      ble.println(F("AT+BLEKEYBOARDCODE=00-00"));
-
+    // TODO remove prints afters dev
     if( ble.waitForOK() ) {
       Serial.println( F("OK!") );
     } else {
       Serial.println( F("FAILED!") );
     }
-//    for (int i = 0; i < 6; i++) {
-//      if (keys[i] != KEY_NONE){
-//        ble.print("-07");
-//        ble.print(keys[i],HEX);
-//      }
-      
-//    }
-//    ble.println("");
-  
-      //modifiers 
-    //TODO get keys from left side
-    //TODO send report
-    //TODO release
-    // key release notification
-//    ble.println("AT+BleKeyboardCode=00-00");
   }
   delay(100);
 }
