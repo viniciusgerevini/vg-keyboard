@@ -36,7 +36,7 @@ void error(const __FlashStringHelper*err) {
 }
 
 void setup(void) {
-  while (!Serial);  // required for Flora & Micro
+  /* while (!Serial);  // required for Flora & Micro */
   delay(500);
 
   Serial.begin(115200);
@@ -83,6 +83,9 @@ void setup(void) {
       error(F("Could not enable Keyboard"));
     }
   }
+
+
+  Serial1.begin(9600);
 
   /* Add or remove service requires a reset */
   /* Serial.println(F("Performing a SW reset (service changes require a reset): ")); */
@@ -162,6 +165,22 @@ KeyReport readMatrix() {
     }
  
     pinMode(rowPin, INPUT);
+  }
+  // TODO read right side
+  if (Serial1.available()) {
+    char output[15] = "";
+    Serial.print("Left side ");
+    /* Serial.print(Serial1.read()); */
+    int result = Serial1.readBytesUntil('$', output, 15);
+    Serial.println(result);
+
+    if (result > 0) {
+      Serial.println("ha");
+      Serial.println(output);
+      Serial.println("finished");
+    } else {
+      Serial.println("No data");
+    }
   }
 
   for (int pos = 0; pos < currentPosition; pos++) {
