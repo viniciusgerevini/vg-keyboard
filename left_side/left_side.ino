@@ -18,13 +18,13 @@
 
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
+#define NUMBER_OF_ROWS 5
+#define NUMBER_OF_COLS 9
+
 byte colPins[] = {5, 6, 9, 10, 11, 12, A5};
 byte rowPins[] = {A0, A1, A2, A3, A4};
 
-const int rowCount = 5;
-const int colCount = 7;
-
-byte keys[rowCount][colCount];
+byte keys[NUMBER_OF_ROWS][NUMBER_OF_COLS];
 
 bool wasReleased = true;
 KeyReport previousReport;
@@ -36,7 +36,6 @@ void error(const __FlashStringHelper*err) {
 }
 
 void setup(void) {
-  /* while (!Serial);  // required for Flora & Micro */
   delay(500);
 
   Serial.begin(115200);
@@ -94,7 +93,6 @@ void setup(void) {
   /* } */
 }
 
-//TODO get keys from left side
 void loop(void) {
   KeyReport report = readMatrix();
   if (!wasReleased && report.isEqual(previousReport)) {
@@ -114,7 +112,6 @@ void loop(void) {
     ble.println("");
     wasReleased = false;
     previousReport = report;
-    // TODO remove prints after dev
     if( ble.waitForOK() ) {
       Serial.println( F("OK!") );
     } else {
@@ -123,7 +120,6 @@ void loop(void) {
   } else if (!wasReleased) {
     wasReleased = true;
     ble.println(F("AT+BLEKEYBOARDCODE=00-00"));
-    // TODO remove prints after dev
     if( ble.waitForOK() ) {
       Serial.println( F("OK!") );
     } else {
@@ -140,12 +136,12 @@ KeyReport readMatrix() {
   int positions[6];
   int currentPosition = 0;
 
-  for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+  for (int rowIndex = 0; rowIndex < NUMBER_OF_ROWS; rowIndex++) {
     byte rowPin = rowPins[rowIndex];
     pinMode(rowPin, OUTPUT);
     digitalWrite(rowPin, LOW);
 
-    for (int colIndex = 0; colIndex < colCount; colIndex++) {
+    for (int colIndex = 0; colIndex < NUMBER_OF_COLS; colIndex++) {
       byte columnPin = colPins[colIndex];
       pinMode(columnPin, INPUT_PULLUP);
       keys[rowIndex][colIndex] = digitalRead(columnPin);
@@ -166,20 +162,32 @@ KeyReport readMatrix() {
  
     pinMode(rowPin, INPUT);
   }
-  // TODO read right side
+
   if (Serial1.available()) {
     char output[15] = "";
-    Serial.print("Left side ");
-    /* Serial.print(Serial1.read()); */
     int result = Serial1.readBytesUntil('$', output, 15);
     Serial.println(result);
-
     if (result > 0) {
-      Serial.println("ha");
       Serial.println(output);
-      Serial.println("finished");
-    } else {
-      Serial.println("No data");
+      char* ptr = strtok(output, "_");
+      while (ptr) {
+        if (currentPosition >= 6) {
+          break;
+        }
+
+        int rightSidePos = atol(ptr);
+        int keycode = getKeyCodeAtPosition(rightSidePos);
+        if (isLayerToggle(keycode)) {
+          changeLayer(keycode);
+        } else if (isModifier(keycode)) {
+          report.addModifier(getModifierCode(keycode));
+        } else if (currentPosition < 6) {
+          positions[currentPosition] = rightSidePos;
+          currentPosition += 1;
+        }
+
+        ptr = strtok(NULL, "_");
+      }
     }
   }
 
